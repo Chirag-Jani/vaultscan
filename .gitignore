@@ -12,4 +12,5 @@ venv/
 .ruff_cache/
 data/idls/*.json
 !data/idls/.gitkeep
+data/parsed/
 .DS_Store
