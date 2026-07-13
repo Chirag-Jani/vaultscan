@@ -7,6 +7,7 @@ import json
 import sys
 from pathlib import Path
 
+from vaultscan.authority import AuthorityError, AuthorityResult, check_all, check_authority
 from vaultscan.config import load_config
 from vaultscan.idl_fetch import IdlFetchError, FetchResult, fetch_all, fetch_idl
 from vaultscan.idl_parse import ParseResult, load_and_parse, parse_all_idls, resolve_idl_path
@@ -60,6 +61,17 @@ def _build_parser() -> argparse.ArgumentParser:
         "--verbose",
         action="store_true",
         help="Print instruction evidence per account",
+    )
+
+    auth_one = sub.add_parser(
+        "check-authority",
+        help="Stage 2: check upgrade authority for one program",
+    )
+    auth_one.add_argument("program_id", help="On-chain program address")
+
+    sub.add_parser(
+        "check-all",
+        help="Stage 2: check upgrade authority for all programs.json entries",
     )
     return parser
 
@@ -152,6 +164,21 @@ def _print_fetch_result(result: FetchResult) -> None:
         print(f"fail  {result.program_id}  {_short_error(result.error or '')}", file=sys.stderr)
 
 
+def _print_authority_result(result: AuthorityResult) -> None:
+    if not result.ok:
+        print(
+            f"fail  {result.program_id}  {_short_error(result.error or '')}",
+            file=sys.stderr,
+        )
+        return
+    if result.authority_status == "renounced":
+        print(f"renounced  {result.program_id}")
+    elif result.authority_status == "live":
+        print(f"live       {result.program_id}  authority={result.authority}")
+    else:
+        print(f"unknown    {result.program_id}")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -212,6 +239,28 @@ def main(argv: list[str] | None = None) -> int:
             f"false={totals['false']}  ambiguous={totals['ambiguous']}  true={totals['true']}"
         )
         return 0
+
+    if args.command == "check-authority":
+        try:
+            result = check_authority(config, args.program_id)
+        except AuthorityError as exc:
+            print(
+                f"fail  {args.program_id}  {_short_error(str(exc))}",
+                file=sys.stderr,
+            )
+            return 1
+        _print_authority_result(result)
+        return 0
+
+    if args.command == "check-all":
+        results = check_all(config)
+        ok_count = sum(1 for r in results if r.ok)
+        live = sum(1 for r in results if r.ok and r.authority_status == "live")
+        renounced = sum(1 for r in results if r.ok and r.authority_status == "renounced")
+        for r in results:
+            _print_authority_result(r)
+        print(f"checked {ok_count}/{len(results)}  live={live}  renounced={renounced}")
+        return 0 if ok_count == len(results) else 1
 
     parser.error(f"unknown command: {args.command}")
     return 2

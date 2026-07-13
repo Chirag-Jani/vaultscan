@@ -13,4 +13,6 @@ venv/
 data/idls/*.json
 !data/idls/.gitkeep
 data/parsed/
+data/authority/*.json
+!data/authority/.gitkeep
 .DS_Store

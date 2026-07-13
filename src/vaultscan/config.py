@@ -37,6 +37,14 @@ class Config:
     def fixtures_dir(self) -> Path:
         return self.data_dir / "fixtures"
 
+    @property
+    def authority_dir(self) -> Path:
+        return self.data_dir / "authority"
+
+    @property
+    def parsed_dir(self) -> Path:
+        return self.data_dir / "parsed"
+
 
 def load_config(env_file: Path | None = None) -> Config:
     load_dotenv(env_file or (REPO_ROOT / ".env"))
